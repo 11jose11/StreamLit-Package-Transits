@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from studio import (
     apply_gemini_report,
+    can_push_resend_draft,
     default_interval_keys,
     default_rule_keys,
     filter_facts,
@@ -9,6 +10,7 @@ from studio import (
     generate_request,
     interval_picker_rows,
     report_payload,
+    resend_email_payload,
     seed_draft,
     selected_interval_keys_from_rows,
     selection_from_editor,
@@ -235,3 +237,21 @@ def test_empty_editor_does_not_clear_selection() -> None:
     unchecked = [{**row, "Include": False} for row in rows]
     cleared = selection_from_editor(unchecked, None, kind="intervals", expected=len(rows))
     assert cleared == []
+
+
+def test_resend_payload_requires_email_body_and_moon() -> None:
+    draft = seed_draft(FACTS, RULES, None)
+    assert can_push_resend_draft(draft) is False
+    draft["email_body"] = "  Carta de octubre.  "
+    payload = resend_email_payload(draft)
+    assert payload == {
+        "month": "October 2026",
+        "moon_sign": "Aries",
+        "email_subject": "",
+        "email_preheader": "",
+        "email_body": "Carta de octubre.",
+        "language": "es",
+    }
+    assert can_push_resend_draft(draft) is True
+    assert can_push_resend_draft({**draft, "moon_sign": "  "}) is False
+    assert can_push_resend_draft(None) is False

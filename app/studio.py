@@ -568,6 +568,24 @@ def report_payload(draft: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def resend_email_payload(draft: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "month": str(draft.get("month") or "").strip(),
+        "moon_sign": str(draft.get("moon_sign") or "").strip(),
+        "email_subject": str(draft.get("email_subject") or "").strip(),
+        "email_preheader": str(draft.get("email_preheader") or "").strip(),
+        "email_body": str(draft.get("email_body") or "").strip(),
+        "language": "es",
+    }
+
+
+def can_push_resend_draft(draft: dict[str, Any] | None) -> bool:
+    if not draft:
+        return False
+    payload = resend_email_payload(draft)
+    return bool(payload["email_body"] and payload["moon_sign"])
+
+
 def gemini_brief(
     facts: dict[str, Any],
     rules: list[dict[str, Any]],

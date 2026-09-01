@@ -27,9 +27,11 @@ cp .env.example .env
 
 ```env
 TRANSIT_API_URL=http://127.0.0.1:8000
+MARKETING_API_URL=http://127.0.0.1:8080
+MARKETING_API_KEY=
 ```
 
-Never put `SUPABASE_KEY` or `GEMINI_API_KEY` here. Those belong to the API.
+Never put `SUPABASE_KEY`, `GEMINI_API_KEY`, or `RESEND_API_KEY` here. Those belong to Transit Intelligence and Marketing Backend.
 
 # Run locally
 

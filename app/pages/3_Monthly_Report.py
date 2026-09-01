@@ -5,12 +5,12 @@ import json
 
 import streamlit as st
 
+import config as config_mod
 import flatten as flatten_mod
 import state as state_mod
 import studio as studio_mod
 import views as views_mod
 from api_client import get_health, post_json
-from config import TRANSIT_TIMEOUT
 from flatten import retrieved_rule_count
 
 
@@ -18,11 +18,122 @@ def _bump_draft() -> None:
     st.session_state.studio_draft_rev = int(st.session_state.get("studio_draft_rev") or 0) + 1
 
 
+def _seed_resend_widgets(draft: dict | None, rev: int) -> None:
+    if not draft:
+        return
+    seeds = {
+        f"draft_month_{rev}": draft.get("month") or "",
+        f"draft_moon_{rev}": draft.get("moon_sign") or "",
+        f"draft_email_subject_{rev}": draft.get("email_subject") or "",
+        f"draft_email_preheader_{rev}": draft.get("email_preheader") or "",
+        f"draft_email_body_{rev}": draft.get("email_body") or "",
+    }
+    for key, value in seeds.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+
+def _marketing_configured() -> bool:
+    checker = getattr(config_mod, "marketing_configured", None)
+    if callable(checker):
+        return bool(checker())
+    url_fn = getattr(config_mod, "marketing_api_url", None)
+    return bool(url_fn()) if callable(url_fn) else False
+
+
+def _resend_payload(draft: dict | None) -> dict:
+    payload_fn = getattr(studio_mod, "resend_email_payload", None)
+    if callable(payload_fn) and draft is not None:
+        return payload_fn(draft)
+    draft = draft or {}
+    return {
+        "month": str(draft.get("month") or "").strip(),
+        "moon_sign": str(draft.get("moon_sign") or "").strip(),
+        "email_subject": str(draft.get("email_subject") or "").strip(),
+        "email_preheader": str(draft.get("email_preheader") or "").strip(),
+        "email_body": str(draft.get("email_body") or "").strip(),
+        "language": "es",
+    }
+
+
+def _post_marketing_broadcast(payload: dict):
+    import httpx
+
+    url_fn = getattr(config_mod, "marketing_api_url", None)
+    key_fn = getattr(config_mod, "marketing_api_key", None)
+    base = url_fn() if callable(url_fn) else ""
+    if not base:
+        st.error("MARKETING_API_URL no está configurada.")
+        return None
+    url = f"{base}/v1/marketing/monthly-broadcasts"
+    headers = {}
+    token = key_fn() if callable(key_fn) else ""
+    if token:
+        headers["X-API-Key"] = token
+    timeout = float(getattr(config_mod, "MARKETING_TIMEOUT", 60.0))
+    try:
+        response = httpx.post(url, json=payload, headers=headers, timeout=timeout)
+    except httpx.HTTPError as exc:
+        st.error(f"No se pudo conectar a Marketing Backend ({url}): {exc}")
+        return None
+    if response.status_code >= 400:
+        st.error(f"{response.status_code} /v1/marketing/monthly-broadcasts: {response.text}")
+        return None
+    return response.json()
+
+
+def _push_resend_draft(draft: dict | None):
+    payload = _resend_payload(draft)
+    try:
+        import api_client as api_client_mod
+
+        api_client_mod = importlib.reload(api_client_mod)
+        sender = getattr(api_client_mod, "create_monthly_broadcast_draft", None)
+        if callable(sender):
+            return sender(payload)
+    except Exception:
+        pass
+    return _post_marketing_broadcast(payload)
+
+
+def _render_resend_draft_button(draft: dict | None) -> None:
+    ready_fn = getattr(studio_mod, "can_push_resend_draft", None)
+    ready = bool(ready_fn(draft)) if callable(ready_fn) else False
+    configured = _marketing_configured()
+    st.caption(
+        "Crea un broadcast draft en Resend. No envía. "
+        "Revisa y envía desde el dashboard de Resend."
+    )
+    if not configured:
+        st.caption("Falta MARKETING_API_URL en StreamLit Package/.env.")
+    elif not ready:
+        st.caption("Necesitas signo lunar y cuerpo de email. Genera con Gemini primero.")
+    if st.button(
+        "Send draft to Resend",
+        disabled=not ready or not configured,
+        key="push_resend_draft",
+    ):
+        try:
+            result = _push_resend_draft(draft)
+        except Exception as exc:
+            st.error(f"No se pudo crear el draft en Resend: {exc}")
+            return
+        if result:
+            name = result.get("template_name") or result.get("name") or "Resend"
+            subject = result.get("subject") or ""
+            broadcast_id = result.get("resend_broadcast_id") or "—"
+            st.success(f"Draft creado: {name} · {subject} · id {broadcast_id}")
+            if result.get("review_hint"):
+                st.caption(result["review_hint"])
+
+
+config_mod = importlib.reload(config_mod)
 flatten_mod = importlib.reload(flatten_mod)
 state_mod = importlib.reload(state_mod)
 studio_mod = importlib.reload(studio_mod)
 views_mod = importlib.reload(views_mod)
 render_report = views_mod.render_report
+TRANSIT_TIMEOUT = config_mod.TRANSIT_TIMEOUT
 
 st.set_page_config(page_title="Monthly Report Studio", layout="wide")
 state_mod.init_state()
@@ -269,18 +380,15 @@ with draft_tab:
             _bump_draft()
             st.rerun()
 
-    draft = st.session_state.studio_draft
+    draft = st.session_state.studio_draft or studio_mod.empty_draft(facts)
     rev = int(st.session_state.studio_draft_rev or 0)
+    _seed_resend_widgets(draft, rev)
     draft["title"] = st.text_input(
         "Title", value=draft.get("title") or "", key=f"draft_title_{rev}"
     )
     meta_a, meta_b = st.columns(2)
-    draft["month"] = meta_a.text_input(
-        "Month label", value=draft.get("month") or "", key=f"draft_month_{rev}"
-    )
-    draft["moon_sign"] = meta_b.text_input(
-        "Moon sign", value=draft.get("moon_sign") or "", key=f"draft_moon_{rev}"
-    )
+    draft["month"] = meta_a.text_input("Month label", key=f"draft_month_{rev}")
+    draft["moon_sign"] = meta_b.text_input("Moon sign", key=f"draft_moon_{rev}")
     draft["overview"] = st.text_area(
         "Overview",
         value=draft.get("overview") or "",
@@ -340,23 +448,17 @@ with draft_tab:
         key=f"draft_recs_{rev}",
     )
     st.markdown("### Email")
-    draft["email_subject"] = st.text_input(
-        "Email subject",
-        value=draft.get("email_subject") or "",
-        key=f"draft_email_subject_{rev}",
-    )
+    draft["email_subject"] = st.text_input("Email subject", key=f"draft_email_subject_{rev}")
     draft["email_preheader"] = st.text_input(
-        "Email preheader",
-        value=draft.get("email_preheader") or "",
-        key=f"draft_email_preheader_{rev}",
+        "Email preheader", key=f"draft_email_preheader_{rev}"
     )
     draft["email_body"] = st.text_area(
         "Email body",
-        value=draft.get("email_body") or "",
         height=420,
         key=f"draft_email_body_{rev}",
     )
     st.session_state.studio_draft = draft
+    _render_resend_draft_button(draft)
 
 with preview_tab:
     draft = st.session_state.studio_draft or studio_mod.empty_draft(facts)

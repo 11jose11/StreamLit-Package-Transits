@@ -24,8 +24,9 @@ FACTS = {
                     "degree_start": 12.54321,
                     "direction": "direct",
                     "speed_longitude": 0.123456,
-                    "gati": None,
-                    "chesta_bala_virupa": None,
+                    "gati": "sama",
+                    "gati_status": "classified",
+                    "chesta_bala_virupa": 7.5,
                 }
             ],
         },
@@ -40,8 +41,9 @@ FACTS = {
                     "degree_start": 3.0,
                     "direction": "direct",
                     "speed_longitude": 0.5,
-                    "gati": "Sheeghra",
-                    "chesta_bala_virupa": 42.0,
+                    "gati": "sighra",
+                    "gati_status": "classified",
+                    "chesta_bala_virupa": 45.0,
                 }
             ],
         },
@@ -66,11 +68,43 @@ def test_flatten_intervals_formats_rows() -> None:
     assert jupiter["Sign"] == "Cancer"
     assert jupiter["House from Moon"] == 4
     assert jupiter["Degree"] == 12.5432
-    assert jupiter["Gati"] == "—"
-    assert jupiter["Ceṣṭā Bala"] == "—"
+    assert jupiter["Gati"] == "Sama"
+    assert jupiter["Gati status"] == "classified"
+    assert jupiter["Ceṣṭā Bala (virūpa)"] == "7.5"
+    assert jupiter["RAG meaning"] == "—"
     mars = rows[1]
-    assert mars["Gati"] == "Sheeghra"
-    assert mars["Ceṣṭā Bala"] == 42.0
+    assert mars["Gati"] == "Śīghra"
+    assert mars["Ceṣṭā Bala (virūpa)"] == "45"
+
+
+def test_flatten_not_applicable_gati() -> None:
+    rows = flatten_intervals(
+        {
+            "planets": [
+                {
+                    "planet": "Sun",
+                    "intervals": [
+                        {
+                            "start": "2026-10-01T00:00:00Z",
+                            "end": "2026-10-31T23:59:00Z",
+                            "sign": "Virgo",
+                            "house_from_moon": 6,
+                            "degree_start": 10.0,
+                            "direction": "direct",
+                            "speed_longitude": 0.98,
+                            "gati": None,
+                            "gati_status": "not_applicable",
+                            "chesta_bala_virupa": None,
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+    assert rows[0]["Gati"] == "—"
+    assert rows[0]["Gati status"] == "n/a"
+    assert rows[0]["Ceṣṭā Bala (virūpa)"] == "—"
+    assert rows[0]["RAG meaning"] == "—"
 
 
 def test_flatten_events() -> None:
@@ -99,7 +133,7 @@ def test_flatten_rules_none_and_preview() -> None:
         },
         {
             "planet": "Mars",
-            "fact": {"house_from_moon": 5},
+            "fact": {"house_from_moon": 5, "gati": "sighra", "sign": "Leo", "direction": "direct"},
             "retrieved_rules": [
                 {
                     "content": "x" * 410,
@@ -113,8 +147,26 @@ def test_flatten_rules_none_and_preview() -> None:
     assert rows[0]["Retrieved rule"] == "(none)"
     assert rows[1]["Retrieved rule"].endswith("…")
     assert len(rows[1]["Retrieved rule"]) == 401
-    assert rows[1]["Similarity score"] == 0.8765
+    assert rows[1]["Similarity score"] == "0.8765"
+    assert rows[1]["Gati"] == "Śīghra"
     assert retrieved_rule_count(rules) == 1
+
+
+def test_flatten_intervals_applies_rag_meaning() -> None:
+    rules = [
+        {
+            "planet": "Jupiter",
+            "fact": {"house_from_moon": 4, "gati": "sama"},
+            "retrieved_rules": [
+                {
+                    "content": "### Tránsito en la Casa 4\nPhaladeepika: Aumento de la felicidad."
+                }
+            ],
+        }
+    ]
+    rows = flatten_intervals(FACTS, rules)
+    assert "Phaladeepika" in rows[0]["RAG meaning"]
+    assert rows[1]["RAG meaning"] == "—"
 
 
 def test_interval_count() -> None:

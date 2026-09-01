@@ -39,4 +39,4 @@ exclude = [".venv"]
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["api_client", "config", "constants", "flatten", "state", "views"]
+known-first-party = ["api_client", "config", "constants", "flatten", "state", "studio", "views"]

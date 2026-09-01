@@ -1,18 +1,32 @@
 from __future__ import annotations
 
+import importlib
+
 import streamlit as st
 
+import flatten as flatten_mod
+import state as state_mod
+import views as views_mod
 from api_client import get_health, post_json
 from config import TRANSIT_TIMEOUT, api_url
 from constants import MONTH_NAMES, SIGNS
 from flatten import interval_count, retrieved_rule_count
-from state import init_state, reset_downstream_of_facts, reset_report
+
+flatten_mod = importlib.reload(flatten_mod)
+state_mod = importlib.reload(state_mod)
+views_mod = importlib.reload(views_mod)
+render_facts = views_mod.render_facts
+init_state = state_mod.init_state
+reset_downstream_of_facts = state_mod.reset_downstream_of_facts
+reset_report = state_mod.reset_report
 
 st.set_page_config(page_title="Monthly Jyotish Transit Report", layout="wide")
 init_state()
 
 st.title("MONTHLY JYOTISH TRANSIT REPORT")
-st.caption("Calculate → review facts → retrieve RAG rules → generate Gemini report.")
+st.caption(
+    "Calculate → review facts → retrieve RAG rules → prepare the report in Monthly Report Studio."
+)
 
 health = get_health()
 api_ok = health is not None and health.get("status") == "ok"
@@ -51,46 +65,40 @@ st.divider()
 calculate_disabled = not ephemeris_ok
 if st.button("1. Calculate Transits", type="primary", disabled=calculate_disabled):
     reset_downstream_of_facts()
-    facts = post_json("/v1/transits/monthly", request_payload, timeout=TRANSIT_TIMEOUT)
-    st.session_state.facts = facts
+    with st.spinner("Calculating transits and retrieving RAG notes..."):
+        facts = post_json("/v1/transits/monthly", request_payload, timeout=TRANSIT_TIMEOUT)
+        st.session_state.facts = facts
+        if facts and rag_ok:
+            retrieved = post_json("/v1/transits/monthly/rules", facts, timeout=TRANSIT_TIMEOUT)
+            if retrieved is not None:
+                st.session_state.rules = retrieved
 
 facts = st.session_state.facts
 if facts:
-    st.success(
-        f"Transit facts ready ({interval_count(facts)} intervals). "
-        "Open **Transit Facts** in the sidebar to review them."
-    )
+    st.success(f"Transit facts ready ({interval_count(facts)} intervals).")
 
 st.divider()
 retrieve_disabled = facts is None or not rag_ok
 if st.button("2. Retrieve Interpretation Rules", disabled=retrieve_disabled):
-    reset_report()
-    rules = post_json("/v1/transits/monthly/rules", facts, timeout=TRANSIT_TIMEOUT)
-    st.session_state.rules = rules
+    with st.spinner("Retrieving Jyotiṣa notes from the knowledge base..."):
+        reset_report()
+        retrieved = post_json("/v1/transits/monthly/rules", facts, timeout=TRANSIT_TIMEOUT)
+        if retrieved is not None:
+            st.session_state.rules = retrieved
 
 rules = st.session_state.rules
 if rules is not None:
-    st.success(
-        f"Retrieved {retrieved_rule_count(rules)} RAG rules. "
-        "Open **Interpretation Rules** in the sidebar to review them."
-    )
+    st.success(f"Retrieved {retrieved_rule_count(rules)} RAG notes — shown on the transits below.")
+
+if facts:
+    render_facts(facts, rules=rules)
 
 st.divider()
-generate_disabled = facts is None or rules is None or not gemini_ok
-if st.button("3. Generate Monthly Report", disabled=generate_disabled):
-    report = post_json(
-        "/v1/reports/monthly",
-        {
-            "calculated_facts": facts,
-            "retrieved_rules": rules,
-            "locale": "es",
-        },
-        timeout=TRANSIT_TIMEOUT,
+studio_disabled = facts is None
+if st.button("3. Open Monthly Report Studio", disabled=studio_disabled):
+    st.switch_page("pages/3_Monthly_Report.py")
+if facts:
+    st.caption(
+        "The studio prepares Spanish report text from selected transit ranges, "
+        "house RAG notes, and retrieved Ceṣṭā Bala notes."
     )
-    st.session_state.report = report
-
-report = st.session_state.report
-if report:
-    st.success("Monthly report ready. Open **Monthly Report** in the sidebar.")
-    st.markdown(f"**{report.get('title') or 'Monthly report'}**")
-    st.write(report.get("overview") or "")

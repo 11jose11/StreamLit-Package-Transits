@@ -55,15 +55,6 @@ if facts and st.session_state.studio_draft is not None:
 
 interval_widget_key = f"studio_intervals_{facts_id}"
 rule_widget_key = f"studio_rules_{facts_id}_{retrieved_rule_count(rules)}"
-if interval_widget_key in st.session_state:
-    st.session_state.studio_interval_include = studio_mod.selected_interval_keys_from_rows(
-        st.session_state[interval_widget_key]
-    )
-if rule_widget_key in st.session_state:
-    st.session_state.studio_rule_include = studio_mod.selected_rule_keys_from_rows(
-        st.session_state[rule_widget_key]
-    )
-
 include_intervals = st.session_state.studio_interval_include
 include_rules = st.session_state.studio_rule_include
 ready = studio_mod.studio_readiness(facts, rules, include_intervals, include_rules)
@@ -114,12 +105,27 @@ with material_tab:
                 "Gati status",
                 "Ceṣṭā Bala (virūpa)",
                 "RAG meaning",
+                "_key",
+            ],
+            column_order=[
+                "Include",
+                "Planet",
+                "Period",
+                "Sign",
+                "House from Moon",
+                "Gati",
+                "Gati status",
+                "Ceṣṭā Bala (virūpa)",
+                "RAG meaning",
             ],
             column_config={"Include": st.column_config.CheckboxColumn(required=True)},
             key=interval_widget_key,
         )
-        st.session_state.studio_interval_include = (
-            studio_mod.selected_interval_keys_from_rows(edited_intervals)
+        st.session_state.studio_interval_include = studio_mod.selection_from_editor(
+            edited_intervals,
+            st.session_state.studio_interval_include,
+            kind="intervals",
+            expected=len(interval_rows),
         )
         select_a, select_b = st.columns(2)
         if select_a.button("Include all ranges", key="include_all_ranges"):
@@ -163,8 +169,11 @@ with material_tab:
                 column_config={"Include": st.column_config.CheckboxColumn(required=True)},
                 key=rule_widget_key,
             )
-            st.session_state.studio_rule_include = (
-                studio_mod.selected_rule_keys_from_rows(edited_rules)
+            st.session_state.studio_rule_include = studio_mod.selection_from_editor(
+                edited_rules,
+                st.session_state.studio_rule_include,
+                kind="rules",
+                expected=len(rule_rows),
             )
             rag_a, rag_b = st.columns(2)
             if rag_a.button("Include all RAG", key="include_all_rag"):

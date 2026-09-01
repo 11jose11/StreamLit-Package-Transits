@@ -7,8 +7,11 @@ from studio import (
     filter_facts,
     filter_rules,
     generate_request,
+    interval_picker_rows,
     report_payload,
     seed_draft,
+    selected_interval_keys_from_rows,
+    selection_from_editor,
     studio_readiness,
 )
 
@@ -183,3 +186,52 @@ def test_readiness_requires_selected_ranges() -> None:
     assert ready["chesta_status"] == "on"
     blocked = studio_readiness(FACTS, RULES, [], None)
     assert blocked["can_generate"] is False
+
+
+def test_interval_selection_uses_stable_key() -> None:
+    facts = {
+        **FACTS,
+        "planets": [
+            *FACTS["planets"],
+            {
+                "planet": "Moon",
+                "intervals": [
+                    {
+                        "start": "2026-10-01T00:00:00Z",
+                        "end": "2026-10-02T00:00:00Z",
+                        "sign": "Aries",
+                        "house_from_moon": 1,
+                    }
+                ],
+            },
+        ],
+    }
+    rows = interval_picker_rows(facts, RULES, None)
+    assert [row["Planet"] for row in rows] == ["Jupiter", "Mars"]
+    assert all(row["_key"] for row in rows)
+    mutated = []
+    for row in rows:
+        copy = dict(row)
+        copy["Period"] = "changed-by-editor → value"
+        mutated.append(copy)
+    mutated[1]["Include"] = False
+    keys = selected_interval_keys_from_rows(mutated)
+    assert keys == [rows[0]["_key"]]
+    assert studio_readiness(facts, RULES, keys, None)["selected_ranges"] == 1
+    assert "Moon" not in [planet["planet"] for planet in filter_facts(facts, None)["planets"]]
+
+
+def test_empty_editor_does_not_clear_selection() -> None:
+    rows = interval_picker_rows(FACTS, RULES, None)
+    kept = selection_from_editor([], None, kind="intervals", expected=len(rows))
+    assert kept is None
+    kept_partial = selection_from_editor(
+        [rows[0]],
+        None,
+        kind="intervals",
+        expected=len(rows),
+    )
+    assert kept_partial is None
+    unchecked = [{**row, "Include": False} for row in rows]
+    cleared = selection_from_editor(unchecked, None, kind="intervals", expected=len(rows))
+    assert cleared == []

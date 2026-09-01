@@ -9,9 +9,12 @@ from flatten import (
     format_gati_status,
     format_virupa,
     interval_count,
+    is_moon_transit,
     rag_meaning_for_planet,
     rag_meaning_index,
     retrieved_rule_count,
+    without_moon_rules,
+    without_moon_transits,
 )
 
 
@@ -48,6 +51,8 @@ def facts_fingerprint(facts: dict[str, Any] | None) -> str:
 def iter_intervals(facts: dict[str, Any]) -> Iterator[tuple[str, dict[str, Any]]]:
     for planet in facts.get("planets") or []:
         name = str(planet.get("planet") or "")
+        if is_moon_transit(name):
+            continue
         for interval in planet.get("intervals") or []:
             yield name, interval
 
@@ -64,6 +69,9 @@ def interval_key(planet: str, interval: dict[str, Any]) -> str:
 
 
 def interval_key_from_row(row: dict[str, Any]) -> str:
+    stored = str(row.get("_key") or "").strip()
+    if stored:
+        return stored
     period = str(row.get("Period") or "")
     start, end = period.split(" → ", 1) if " → " in period else ("", "")
     return "|".join(
@@ -90,7 +98,7 @@ def default_rule_keys(rules: list[dict[str, Any]]) -> list[str]:
 
 def iter_rule_entries(rules: list[dict[str, Any]]) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
-    for item_index, item in enumerate(rules):
+    for item_index, item in enumerate(without_moon_rules(rules)):
         fact = item.get("fact") or {}
         retrieved = item.get("retrieved_rules") or []
         if not retrieved:
@@ -130,6 +138,7 @@ def iter_rule_entries(rules: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def filter_facts(
     facts: dict[str, Any], include_keys: list[str] | None
 ) -> dict[str, Any]:
+    facts = without_moon_transits(facts) or {}
     if include_keys is None:
         return facts
     allowed = set(include_keys)
@@ -156,6 +165,7 @@ def filter_facts(
 def filter_rules(
     rules: list[dict[str, Any]], include_keys: list[str] | None
 ) -> list[dict[str, Any]]:
+    rules = without_moon_rules(rules)
     if include_keys is None:
         return list(rules)
     allowed = set(include_keys)
@@ -218,6 +228,7 @@ def interval_picker_rows(
                 "Gati status": format_gati_status(interval.get("gati_status")),
                 "Ceṣṭā Bala (virūpa)": format_virupa(interval.get("chesta_bala_virupa")),
                 "RAG meaning": meaning or "—",
+                "_key": key,
             }
         )
     return rows
@@ -263,7 +274,33 @@ def selected_rule_keys_from_rows(rows: Any) -> list[str]:
 
 
 def selected_interval_keys_from_rows(rows: Any) -> list[str]:
-    return [interval_key_from_row(row) for row in as_records(rows) if row.get("Include")]
+    keys: list[str] = []
+    for row in as_records(rows):
+        if not row.get("Include"):
+            continue
+        if is_moon_transit(row.get("Planet")):
+            continue
+        key = interval_key_from_row(row)
+        if key:
+            keys.append(key)
+    return keys
+
+
+def selection_from_editor(
+    rows: Any,
+    fallback: list[str] | None,
+    *,
+    kind: str,
+    expected: int | None = None,
+) -> list[str] | None:
+    records = as_records(rows)
+    if not records:
+        return fallback
+    if expected is not None and len(records) < expected:
+        return fallback
+    if kind == "rules":
+        return selected_rule_keys_from_rows(records)
+    return selected_interval_keys_from_rows(records)
 
 
 def chesta_rows(facts: dict[str, Any]) -> list[dict[str, Any]]:
@@ -482,13 +519,21 @@ def apply_gemini_report(draft: dict[str, Any], report: dict[str, Any]) -> dict[s
             for item in draft.get("major_transits") or []
         }
         merged["major_transits"] = [
-            {**item, "working_notes": notes.get(item.get("planet"), "")} for item in incoming
+            {**item, "working_notes": notes.get(item.get("planet"), "")}
+            for item in incoming
+            if not is_moon_transit(item.get("planet"))
         ]
     incoming_chesta = report.get("chesta_bala_commentary") or []
     if incoming_chesta:
-        merged["chesta_bala_commentary"] = incoming_chesta
+        merged["chesta_bala_commentary"] = [
+            item for item in incoming_chesta if not is_moon_transit(item.get("planet"))
+        ]
     else:
-        merged["chesta_bala_commentary"] = list(draft.get("chesta_bala_commentary") or [])
+        merged["chesta_bala_commentary"] = [
+            item
+            for item in draft.get("chesta_bala_commentary") or []
+            if not is_moon_transit(item.get("planet"))
+        ]
     return merged
 
 
@@ -506,6 +551,7 @@ def report_payload(draft: dict[str, Any]) -> dict[str, Any]:
                 "interpretation": item.get("interpretation") or "",
             }
             for item in draft.get("major_transits") or []
+            if not is_moon_transit(item.get("planet"))
         ],
         "chesta_bala_commentary": [
             {
@@ -513,6 +559,7 @@ def report_payload(draft: dict[str, Any]) -> dict[str, Any]:
                 "commentary": item.get("commentary") or "",
             }
             for item in draft.get("chesta_bala_commentary") or []
+            if not is_moon_transit(item.get("planet"))
         ],
         "recommendations": draft.get("recommendations") or "",
         "email_subject": draft.get("email_subject") or "",

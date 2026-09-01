@@ -77,6 +77,30 @@ def rag_meaning_index(rules: list[dict[str, Any]] | None) -> dict[tuple[Any, ...
     return index
 
 
+def is_moon_transit(planet: Any) -> bool:
+    return str(planet or "").strip().casefold() in {"moon", "luna", "chandra"}
+
+
+def without_moon_transits(facts: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not facts:
+        return facts
+    planets = [
+        planet
+        for planet in facts.get("planets") or []
+        if not is_moon_transit(planet.get("planet"))
+    ]
+    events = [
+        event
+        for event in facts.get("events") or []
+        if not is_moon_transit(event.get("planet"))
+    ]
+    return {**facts, "planets": planets, "events": events}
+
+
+def without_moon_rules(rules: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    return [item for item in rules or [] if not is_moon_transit(item.get("planet"))]
+
+
 def _as_int(value: Any) -> Any:
     try:
         return int(value)
@@ -88,7 +112,8 @@ def flatten_intervals(
     facts: dict[str, Any],
     rules: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    meanings = rag_meaning_index(rules)
+    facts = without_moon_transits(facts) or {}
+    meanings = rag_meaning_index(without_moon_rules(rules))
     rows: list[dict[str, Any]] = []
     for planet in facts.get("planets") or []:
         name = planet.get("planet")
@@ -120,6 +145,7 @@ def flatten_intervals(
 
 
 def flatten_events(facts: dict[str, Any]) -> list[dict[str, Any]]:
+    facts = without_moon_transits(facts) or {}
     rows: list[dict[str, Any]] = []
     for event in facts.get("events") or []:
         rows.append(
@@ -136,7 +162,7 @@ def flatten_events(facts: dict[str, Any]) -> list[dict[str, Any]]:
 
 def flatten_rules(rules: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for item in rules:
+    for item in without_moon_rules(rules):
         fact = item.get("fact") or {}
         retrieved = item.get("retrieved_rules") or []
         if not retrieved:
@@ -175,10 +201,17 @@ def flatten_rules(rules: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def interval_count(facts: dict[str, Any] | None) -> int:
     if not facts:
         return 0
-    return sum(len(planet.get("intervals") or []) for planet in facts.get("planets") or [])
+    return sum(
+        len(planet.get("intervals") or [])
+        for planet in facts.get("planets") or []
+        if not is_moon_transit(planet.get("planet"))
+    )
 
 
 def retrieved_rule_count(rules: list[dict[str, Any]] | None) -> int:
     if not rules:
         return 0
-    return sum(len(item.get("retrieved_rules") or []) for item in rules)
+    return sum(
+        len(item.get("retrieved_rules") or [])
+        for item in without_moon_rules(rules)
+    )

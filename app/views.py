@@ -6,7 +6,15 @@ import streamlit as st
 
 from api_client import post_json
 from config import TRANSIT_TIMEOUT
-from flatten import flatten_events, flatten_intervals, flatten_rules, format_gati
+from flatten import (
+    flatten_events,
+    flatten_intervals,
+    flatten_rules,
+    format_gati,
+    is_moon_transit,
+    without_moon_rules,
+    without_moon_transits,
+)
 from state import reset_report
 
 
@@ -38,14 +46,15 @@ def render_retrieve_button(facts: dict[str, Any] | None, *, key: str) -> None:
     if st.button("Retrieve interpretation rules", key=key, type="primary"):
         with st.spinner("Retrieving Jyotiṣa notes from the knowledge base..."):
             reset_report()
-            rules = post_json("/v1/transits/monthly/rules", facts, timeout=TRANSIT_TIMEOUT)
+            payload = without_moon_transits(facts) or facts
+            rules = post_json("/v1/transits/monthly/rules", payload, timeout=TRANSIT_TIMEOUT)
             if rules is not None:
-                st.session_state.rules = rules
+                st.session_state.rules = without_moon_rules(rules)
                 st.rerun()
 
 
 def render_rule_meanings(rules: list[dict[str, Any]]) -> None:
-    for item in rules:
+    for item in without_moon_rules(rules):
         fact = item.get("fact") or {}
         planet = item.get("planet") or "—"
         house = fact.get("house_from_moon")
@@ -87,6 +96,8 @@ def render_report(report: dict[str, Any], *, reserved_chesta: bool = False) -> N
     st.write(report.get("overview") or "—")
     st.markdown("### Major transits")
     for item in report.get("major_transits") or []:
+        if is_moon_transit(item.get("planet")):
+            continue
         st.markdown(f"**{item.get('planet', '')}** — {item.get('period', '')}")
         st.markdown(f"*{item.get('title', '')}*")
         st.write(item.get("interpretation") or "")
@@ -94,7 +105,7 @@ def render_report(report: dict[str, Any], *, reserved_chesta: bool = False) -> N
     commentary = [
         item
         for item in report.get("chesta_bala_commentary") or []
-        if item.get("commentary")
+        if item.get("commentary") and not is_moon_transit(item.get("planet"))
     ]
     if commentary:
         for item in commentary:

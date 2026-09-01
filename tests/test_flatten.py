@@ -172,3 +172,31 @@ def test_flatten_intervals_applies_rag_meaning() -> None:
 def test_interval_count() -> None:
     assert interval_count(None) == 0
     assert interval_count(FACTS) == 2
+
+
+def test_flatten_skips_moon_from_moon() -> None:
+    facts = {
+        **FACTS,
+        "planets": [
+            *FACTS["planets"],
+            {
+                "planet": "Moon",
+                "intervals": [
+                    {
+                        "start": "2026-10-01T00:00:00Z",
+                        "end": "2026-10-02T00:00:00Z",
+                        "sign": "Aries",
+                        "house_from_moon": 1,
+                    }
+                ],
+            },
+        ],
+        "events": [
+            *FACTS["events"],
+            {"datetime_utc": "2026-10-03T00:00:00Z", "planet": "Moon", "event_type": "sign_ingress"},
+        ],
+    }
+    assert interval_count(facts) == 2
+    assert [row["Planet"] for row in flatten_intervals(facts)] == ["Jupiter", "Mars"]
+    assert [row["Planet"] for row in flatten_events(facts)] == ["Mercury"]
+    assert flatten_rules([{"planet": "Moon", "fact": {}, "retrieved_rules": []}]) == []

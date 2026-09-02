@@ -27,11 +27,23 @@ cp .env.example .env
 
 ```env
 TRANSIT_API_URL=http://127.0.0.1:8000
-MARKETING_API_URL=http://127.0.0.1:8080
+MARKETING_API_URL=
 MARKETING_API_KEY=
 ```
 
-Never put `SUPABASE_KEY`, `GEMINI_API_KEY`, or `RESEND_API_KEY` here. Those belong to Transit Intelligence and Marketing Backend.
+`MARKETING_API_URL` defaults to `TRANSIT_API_URL`. The FastAPI route is `POST /v1/marketing/monthly-broadcasts` (creates a Resend draft, never sends). Never put `SUPABASE_KEY`, `GEMINI_API_KEY`, or `RESEND_API_KEY` here.
+
+# Streamlit Cloud secrets
+
+App settings → Secrets. Remote Marketing URLs require a key:
+
+```toml
+TRANSIT_API_URL = "https://your-transit-intelligence.a.run.app"
+MARKETING_API_URL = "https://your-transit-intelligence.a.run.app"
+MARKETING_API_KEY = "same-as-INGEST_API_KEY"
+```
+
+Keep the Streamlit app private. Anyone who can open Studio can create Resend drafts (not send them).
 
 # Run locally
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from config import marketing_ready
 from studio import (
     apply_gemini_report,
     can_push_resend_draft,
@@ -255,3 +256,18 @@ def test_resend_payload_requires_email_body_and_moon() -> None:
     assert can_push_resend_draft(draft) is True
     assert can_push_resend_draft({**draft, "moon_sign": "  "}) is False
     assert can_push_resend_draft(None) is False
+
+
+def test_remote_marketing_url_requires_api_key() -> None:
+    assert marketing_ready("http://127.0.0.1:8080", "") is True
+    assert marketing_ready("http://localhost:8080", "") is True
+    assert marketing_ready("https://marketing.example.run.app", "") is False
+    assert marketing_ready("https://marketing.example.run.app", "ingest-key") is True
+    assert marketing_ready("", "ingest-key") is False
+
+
+def test_marketing_url_defaults_to_transit_api(monkeypatch) -> None:
+    import config as config_mod
+
+    monkeypatch.setattr(config_mod, "_secret_or_env", lambda name, default="": default)
+    assert config_mod.marketing_api_url() == config_mod.api_url()

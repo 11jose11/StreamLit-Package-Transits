@@ -38,7 +38,13 @@ def _marketing_configured() -> bool:
     if callable(checker):
         return bool(checker())
     url_fn = getattr(config_mod, "marketing_api_url", None)
-    return bool(url_fn()) if callable(url_fn) else False
+    key_fn = getattr(config_mod, "marketing_api_key", None)
+    ready_fn = getattr(config_mod, "marketing_ready", None)
+    url = url_fn() if callable(url_fn) else ""
+    key = key_fn() if callable(key_fn) else ""
+    if callable(ready_fn):
+        return bool(ready_fn(url, key))
+    return bool(url)
 
 
 def _resend_payload(draft: dict | None) -> dict:
@@ -105,7 +111,8 @@ def _render_resend_draft_button(draft: dict | None) -> None:
         "Revisa y envía desde el dashboard de Resend."
     )
     if not configured:
-        st.caption("Falta MARKETING_API_URL en StreamLit Package/.env.")
+        hint = getattr(config_mod, "marketing_setup_hint", None)
+        st.caption(hint() if callable(hint) else "Falta MARKETING_API_URL.")
     elif not ready:
         st.caption("Necesitas signo lunar y cuerpo de email. Genera con Gemini primero.")
     if st.button(

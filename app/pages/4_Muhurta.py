@@ -5,7 +5,7 @@ import streamlit as st
 from api_client import get_health, post_json
 from config import MUHURTA_TIMEOUT, api_url
 from constants import MONTH_NAMES, MUHURTA_PURPOSES, NAKSHATRAS
-from muhurta_i18n import t
+from muhurta_i18n import panchanga_flags, t, tithi_label
 from state import init_state
 
 st.set_page_config(page_title="Muhūrta Intelligence", layout="wide")
@@ -196,13 +196,29 @@ if result:
             cols[2].write(f"{t(language, 'lagna')}: {chart.get('lagna_sign')}")
             cols[3].write(f"{t(language, 'chandra_lagna')}: {chart.get('chandra_lagna_sign')}")
             cols[4].write(f"{t(language, 'hora')}: {hora.get('lord')}")
-            st.caption(
-                f"Nakṣatra {panch.get('nakshatra')} p.{panch.get('pada')} · "
-                f"Tithi {panch.get('tithi_id')} · Vāra {panch.get('vara')} · "
-                f"Karaṇa {panch.get('karana')} · Yoga {panch.get('yoga')} · "
-                f"{t(language, 'tara')} {tara.get('tara_name') or '—'} · "
-                f"{t(language, 'karaka')} {karaka.get('primary_karaka')}"
+            st.markdown(f"**{t(language, 'panchanga')}**")
+            panch_cols = st.columns(5)
+            panch_cols[0].write(f"{t(language, 'tithi')}: {tithi_label(panch)}")
+            panch_cols[1].write(
+                f"{t(language, 'vara')}: {panch.get('vara') or '—'} "
+                f"({panch.get('vara_lord') or '—'})"
             )
+            panch_cols[2].write(
+                f"{t(language, 'nakshatra')}: {panch.get('nakshatra') or '—'} "
+                f"{t(language, 'pada')} {panch.get('pada') or '—'}"
+            )
+            panch_cols[3].write(f"{t(language, 'karana')}: {panch.get('karana') or '—'}")
+            panch_cols[4].write(f"{t(language, 'yoga')}: {panch.get('yoga') or '—'}")
+            flags = panchanga_flags(panch)
+            tara_line = (
+                f"{t(language, 'tara')}: {tara.get('tara_name') or '—'} "
+                f"({tara.get('tara_number') or '—'})"
+            )
+            karaka_line = f"{t(language, 'karaka')}: {karaka.get('primary_karaka') or '—'}"
+            flag_line = (
+                f"{t(language, 'flags')}: {', '.join(flags)}" if flags else ""
+            )
+            st.caption(" · ".join(part for part in (tara_line, karaka_line, flag_line) if part))
             strengths = candidate.get("strengths") or []
             if strengths:
                 st.markdown("**" + t(language, "strengths") + "**")
@@ -252,6 +268,15 @@ else:
     for item in interpretation.get("key_strengths") or []:
         st.markdown(f"**{item.get('title')}**")
         st.write(item.get("explanation") or "")
+    if interpretation.get("panchanga_interpretation"):
+        st.markdown(f"**{t(language, 'panchanga_notes')}**")
+        st.write(interpretation.get("panchanga_interpretation"))
+    if interpretation.get("planetary_interpretation"):
+        st.markdown(f"**{t(language, 'planetary_notes')}**")
+        st.write(interpretation.get("planetary_interpretation"))
+    if interpretation.get("natal_compatibility"):
+        st.markdown(f"**{t(language, 'natal_notes')}**")
+        st.write(interpretation.get("natal_compatibility"))
     st.markdown(f"**{t(language, 'cautions')}**")
     cautions = interpretation.get("cautions") or []
     st.write("; ".join(cautions) if cautions else t(language, "none"))
@@ -262,6 +287,3 @@ else:
         with st.expander(t(language, "sources")):
             for src in sources:
                 st.caption(f"{src.get('source_file') or ''} · {src.get('source_heading') or ''}")
-    st.write(interpretation.get("panchanga_interpretation") or "")
-    st.write(interpretation.get("planetary_interpretation") or "")
-    st.write(interpretation.get("natal_compatibility") or "")

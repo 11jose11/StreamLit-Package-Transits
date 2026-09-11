@@ -42,6 +42,17 @@ STRINGS = {
         "location_needed": "Search and select a city so latitude, longitude, and timezone are set.",
         "select_candidate": "Selected window",
         "go": "Go",
+        "panchanga": "Pañcāṅga",
+        "tithi": "Tithi",
+        "vara": "Vāra",
+        "nakshatra": "Nakṣatra",
+        "karana": "Karaṇa",
+        "yoga": "Yoga",
+        "pada": "Pāda",
+        "panchanga_notes": "Pañcāṅga notes",
+        "planetary_notes": "Planetary notes",
+        "natal_notes": "Natal compatibility",
+        "flags": "Flags",
     },
     "es": {
         "page_title": "Muhūrta Intelligence",
@@ -84,6 +95,17 @@ STRINGS = {
         "location_needed": "Busca y selecciona una ciudad para fijar latitud, longitud y zona horaria.",
         "select_candidate": "Ventana seleccionada",
         "go": "Buscar",
+        "panchanga": "Pañcāṅga",
+        "tithi": "Tithi",
+        "vara": "Vāra",
+        "nakshatra": "Nakṣatra",
+        "karana": "Karaṇa",
+        "yoga": "Yoga",
+        "pada": "Pāda",
+        "panchanga_notes": "Notas de Pañcāṅga",
+        "planetary_notes": "Notas planetarias",
+        "natal_notes": "Compatibilidad natal",
+        "flags": "Marcas",
     },
 }
 
@@ -91,3 +113,33 @@ STRINGS = {
 def t(language: str, key: str) -> str:
     table = STRINGS["es"] if language.startswith("es") else STRINGS["en"]
     return table.get(key, key)
+
+
+def tithi_label(panch: dict) -> str:
+    name = (panch.get("tithi_name") or "").strip()
+    if not name:
+        raw = (panch.get("tithi_id") or "").split("_")[-1]
+        name = raw.replace("_", " ").title() if raw else "—"
+    paksha = (panch.get("paksha") or "").lower()
+    if paksha == "shukla":
+        return f"Śukla {name}"
+    if paksha == "krishna":
+        return f"Kṛṣṇa {name}"
+    return name or "—"
+
+
+def panchanga_flags(panch: dict) -> list[str]:
+    flags: list[str] = []
+    mapping = (
+        ("is_amavasya", "Amāvasyā"),
+        ("is_krishna_chaturdashi", "Kṛṣṇa Caturdaśī"),
+        ("is_rikta", "Riktā"),
+        ("is_ashtami", "Aṣṭamī"),
+        ("is_visti", "Viṣṭi"),
+        ("is_vaidhrti", "Vaidhṛti"),
+        ("is_vyatipata", "Vyatipāta"),
+    )
+    for key, label in mapping:
+        if panch.get(key):
+            flags.append(label)
+    return flags

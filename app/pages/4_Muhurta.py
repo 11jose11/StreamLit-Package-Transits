@@ -222,7 +222,7 @@ if result:
             strengths = candidate.get("strengths") or []
             if strengths:
                 st.markdown("**" + t(language, "strengths") + "**")
-                for item in strengths[:6]:
+                for item in strengths[:10]:
                     st.write("• " + (item.get("text") or ""))
             with st.expander(t(language, "view_data")):
                 st.json(candidate)

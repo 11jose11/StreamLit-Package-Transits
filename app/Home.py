@@ -25,7 +25,7 @@ init_state()
 
 st.title("MONTHLY JYOTISH TRANSIT REPORT")
 st.caption(
-    "Calculate → review facts → retrieve RAG rules → prepare the report in Monthly Report Studio."
+    "Calculate monthly transits, or open Muhūrta from the button below or the sidebar page list."
 )
 
 health = get_health()
@@ -49,6 +49,8 @@ with st.sidebar:
     st.write("Intervals:", interval_count(facts) if facts else 0)
     st.write("Rules:", retrieved_rule_count(rules) if rules else 0)
     st.write("Report:", "yes" if report else "no")
+    st.divider()
+    st.page_link("pages/4_Muhurta.py", label="Muhūrta")
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -95,8 +97,14 @@ if facts:
 
 st.divider()
 studio_disabled = facts is None
-if st.button("3. Open Monthly Report Studio", disabled=studio_disabled):
-    st.switch_page("pages/3_Monthly_Report.py")
+col_studio, col_muhurta = st.columns(2)
+with col_studio:
+    if st.button("3. Open Monthly Report Studio", disabled=studio_disabled, use_container_width=True):
+        st.switch_page("pages/3_Monthly_Report.py")
+with col_muhurta:
+    if st.button("4. Open Muhūrta", type="primary", use_container_width=True):
+        st.switch_page("pages/4_Muhurta.py")
+st.caption("Muhūrta finds election windows for one month. It does not need transit facts first.")
 if facts:
     st.caption(
         "The studio prepares Spanish report text from selected transit ranges, "

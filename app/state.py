@@ -12,6 +12,12 @@ SESSION_KEYS = (
     "studio_facts_id",
     "studio_rules_id",
     "studio_draft_rev",
+    "muhurta_result",
+    "muhurta_interpretation",
+    "muhurta_geocode",
+    "muhurta_location",
+    "muhurta_selected_rank",
+    "muhurta_places",
 )
 
 

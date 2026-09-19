@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import calendar
+
 import streamlit as st
 
 from api_client import get_health, post_json
@@ -105,6 +107,23 @@ start_hour, end_hour = st.slider(
 st.caption(t(language, "hours_range_caption").format(start=start_hour, end=end_hour))
 excluded = [hour for hour in range(24) if hour < start_hour or hour > end_hour]
 
+last_day = calendar.monthrange(int(year), int(month))[1]
+start_day, end_day = st.slider(
+    t(language, "days_range"),
+    min_value=1,
+    max_value=last_day,
+    value=(1, last_day),
+    key=f"muhurta_days_{int(year)}_{int(month)}",
+    help=t(language, "days_range_help"),
+)
+st.caption(
+    t(language, "days_range_caption").format(
+        start=start_day,
+        end=end_day,
+        month=month_name,
+    )
+)
+
 with st.expander(t(language, "advanced")):
     preferred = st.multiselect(t(language, "preferred_hours"), list(range(start_hour, end_hour + 1)))
     min_duration = st.number_input("Minimum duration (minutes)", min_value=1, max_value=240, value=15)
@@ -142,6 +161,8 @@ if st.button(t(language, "go"), type="primary", disabled=generate_disabled):
             },
             "year": int(year),
             "month": int(month),
+            "start_day": int(start_day),
+            "end_day": int(end_day),
             "language": language,
             "advanced": {
                 "preferred_hours": preferred,

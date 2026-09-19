@@ -94,9 +94,19 @@ with col_m:
 with col_y:
     year = st.number_input(t(language, "year"), min_value=1900, max_value=2100, value=2026, step=1)
 
+start_hour, end_hour = st.slider(
+    t(language, "hours_range"),
+    min_value=0,
+    max_value=23,
+    value=(6, 18),
+    format="%02d:00",
+    help=t(language, "hours_range_help"),
+)
+st.caption(t(language, "hours_range_caption").format(start=start_hour, end=end_hour))
+excluded = [hour for hour in range(24) if hour < start_hour or hour > end_hour]
+
 with st.expander(t(language, "advanced")):
-    preferred = st.multiselect("Preferred hours (0–23)", list(range(24)))
-    excluded = st.multiselect("Excluded hours (0–23)", list(range(24)))
+    preferred = st.multiselect(t(language, "preferred_hours"), list(range(start_hour, end_hour + 1)))
     min_duration = st.number_input("Minimum duration (minutes)", min_value=1, max_value=240, value=15)
     top_n = st.number_input("Number of results", min_value=1, max_value=12, value=5)
 

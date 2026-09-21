@@ -7,7 +7,7 @@ import streamlit as st
 from api_client import get_health, post_json
 from config import MUHURTA_TIMEOUT, api_url
 from constants import MONTH_NAMES, MUHURTA_PURPOSES, NAKSHATRAS
-from muhurta_i18n import panchanga_flags, t, tithi_label
+from muhurta_i18n import format_local_window, panchanga_flags, t, tithi_label
 from state import init_state
 
 st.set_page_config(page_title="Muhūrta Intelligence", layout="wide")
@@ -211,7 +211,11 @@ if result:
         highlight = rank == st.session_state.get("muhurta_selected_rank")
         container = st.container(border=True)
         with container:
-            title = f"#{rank}  {candidate.get('start_time')} → {candidate.get('end_time')}"
+            zone = (result.get("location") or {}).get("timezone") or ""
+            title = (
+                f"#{rank}  "
+                f"{format_local_window(candidate.get('start_time') or '', candidate.get('end_time') or '', zone)}"
+            )
             if highlight:
                 st.markdown(f"**{title}**")
             else:

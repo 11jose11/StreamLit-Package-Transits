@@ -124,6 +124,27 @@ STRINGS = {
 }
 
 
+def format_local_window(start: str, end: str, timezone: str) -> str:
+    """Show a Muhūrta window on the city clock used by the hour selector."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    def _parse(value: str) -> datetime:
+        text = (value or "").replace("Z", "+00:00")
+        parsed = datetime.fromisoformat(text)
+        if timezone and parsed.tzinfo is not None:
+            return parsed.astimezone(ZoneInfo(timezone))
+        return parsed
+
+    start_local = _parse(start)
+    end_local = _parse(end)
+    if start_local.date() == end_local.date():
+        clock = f"{start_local:%Y-%m-%d %H:%M}–{end_local:%H:%M}"
+    else:
+        clock = f"{start_local:%Y-%m-%d %H:%M} → {end_local:%Y-%m-%d %H:%M}"
+    return f"{clock} ({timezone})" if timezone else clock
+
+
 def t(language: str, key: str) -> str:
     table = STRINGS["es"] if language.startswith("es") else STRINGS["en"]
     return table.get(key, key)
